@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Athena — Fluxo Administrativo</title>
+<link rel="icon" type="image/png" href="/css/images/athena-logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo-wrap">
+    <img src="/css/images/athena-logo.png" alt="Athena" class="logo-img">
+    </div>
+    <span class="brand-tagline">Fluxo Administrativo</span>
+  </div>
+  <div class="top-controls">
+    <div class="role-select-wrap">
+      <label for="roleSwitch">Logado como</label>
+      <select id="roleSwitch"></select>
+    </div>
+    <button class="icon-btn" id="chatToggle" aria-label="Abrir chat" title="Chat da equipe">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 5h16v11H8l-4 4V5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+</header>
+
+<div class="layout">
+  <aside>
+    <h2>Cargos &amp; Setores</h2>
+    <div id="cargoList"></div>
+  </aside>
+
+  <main>
+    <div class="board-head">
+      <div>
+        <h2>Quadro de Tarefas</h2>
+        <p>Toque num cartão para ver as instruções ou encaminhar.</p>
+      </div>
+      <button class="btn-primary" id="newTaskBtn">+ Nova tarefa</button>
+    </div>
+
+    <div class="board">
+      <div class="column col-pendente">
+        <div class="col-title">Pendente <span class="count" id="countPendente">0</span></div>
+        <div id="colPendente"></div>
+      </div>
+      <div class="column col-execucao">
+        <div class="col-title">Em Execução <span class="count" id="countExecucao">0</span></div>
+        <div id="colExecucao"></div>
+      </div>
+      <div class="column col-concluido">
+        <div class="col-title">Concluído <span class="count" id="countConcluido">0</span></div>
+        <div id="colConcluido"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- MODAL NOVA TAREFA -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2>Nova tarefa</h2>
+    <p class="sub">A Athena identifica automaticamente o cargo responsável.</p>
+    <div class="field">
+      <label for="taskTitle">Título</label>
+      <input id="taskTitle" type="text" placeholder="Ex: Nota fiscal com erro">
+    </div>
+    <div class="field">
+      <label for="taskDesc">Descrição</label>
+      <textarea id="taskDesc" placeholder="Descreva o problema..."></textarea>
+    </div>
+    <div class="field">
+      <label for="taskCategory">Categoria do problema</label>
+      <select id="taskCategory"></select>
+      <div class="routing-note" id="routingNote"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="cancelTask">Cancelar</button>
+      <button class="btn-primary" id="confirmTask">Criar tarefa</button>
+    </div>
+  </div>
+</div>
+
+<!-- CHAT -->
+<div class="chat-panel" id="chatPanel">
+  <div class="chat-head">
+    <h2>Chat da equipe</h2>
+    <button class="icon-btn" id="chatClose" aria-label="Fechar chat">✕</button>
+  </div>
+  <div class="chat-messages" id="chatMessages"></div>
+  <div class="chat-input">
+    <input id="chatInput" type="text" placeholder="Escreva uma mensagem...">
+    <button class="icon-btn" id="chatSend" aria-label="Enviar">➤</button>
+  </div>
+</div>
+
+<footer>
+  <p>&copy; 2026  Athena Code - Todos os direitos reservados</p>
+</footer>
+
+<script src="../js/js.js"></script>
+</body>
+</html>
