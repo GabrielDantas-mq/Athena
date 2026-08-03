@@ -1,4 +1,9 @@
-// ---------- DADOS BASE ----------
+// ============================================================================
+// ATHENA — front-end
+// Fala com o backend Flask (pasta backend/) através da API em /api/...
+// ============================================================================
+
+// ---------- DADOS DE APOIO (espelham o backend/app.py) ----------
 const cargos = [
   { id:'estagiario', nome:'Estagiário', resolve:['geral'], desc:'Suporte administrativo básico e organização de arquivos.' },
   { id:'financeiro', nome:'Analista Financeiro', resolve:['financeiro'], desc:'Pagamentos, notas fiscais e reembolsos.' },
@@ -16,7 +21,7 @@ const categorias = {
   geral:      { label:'Geral / Administrativo', responsavel:'estagiario', instrucao:'Organize a documentação necessária e atualize o status no quadro.' },
 };
 
-let currentRole = 'estagiario';
+let currentUser = null;   // { id, nome, email, cargo, cargoNome } — vem do backend após login
 let taskSeq = 1;
 
 let tasks = [
@@ -30,26 +35,141 @@ let chatMessages = [
   { autor:'Gerente de Operações', texto:'Já aprovei ontem à tarde, deve estar concluída no quadro.' },
 ];
 
-// ---------- RENDER: SIDEBAR ----------
+// ============================================================================
+// AUTENTICAÇÃO
+// ============================================================================
+const authScreen = document.getElementById('authScreen');
+const appScreen = document.getElementById('appScreen');
+const authError = document.getElementById('authError');
+const loginForm = document.getElementById('loginForm');
+const registerForm = document.getElementById('registerForm');
+
+function mostrarErroAuth(msg){
+  authError.textContent = msg;
+  authError.classList.add('show');
+}
+function limparErroAuth(){
+  authError.textContent = '';
+  authError.classList.remove('show');
+}
+
+// Abas Entrar / Criar conta
+document.querySelectorAll('.auth-tab').forEach(tab=>{
+  tab.onclick = ()=>{
+    document.querySelectorAll('.auth-tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    limparErroAuth();
+    const isLogin = tab.dataset.tab === 'login';
+    loginForm.hidden = !isLogin;
+    registerForm.hidden = isLogin;
+  };
+});
+
+// Popula o <select> de cargos do formulário de cadastro a partir do backend
+async function carregarCargosParaCadastro(){
+  const sel = document.getElementById('regCargo');
+  try{
+    const resp = await fetch('/api/cargos');
+    const lista = await resp.json();
+    sel.innerHTML = lista.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
+  }catch(e){
+    // Se o backend não estiver no ar, usa a lista local como reserva.
+    sel.innerHTML = cargos.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
+  }
+}
+
+function entrarNoApp(usuario){
+  currentUser = usuario;
+  authScreen.hidden = true;
+  appScreen.hidden = false;
+
+  document.getElementById('userName').textContent = usuario.nome;
+  document.getElementById('userCargo').textContent = usuario.cargoNome || usuario.cargo;
+
+  renderSidebar();
+  renderBoard();
+}
+
+loginForm.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  limparErroAuth();
+  const email = document.getElementById('loginEmail').value.trim();
+  const senha = document.getElementById('loginSenha').value;
+  try{
+    const resp = await fetch('/api/login', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      credentials:'same-origin',
+      body: JSON.stringify({ email, senha })
+    });
+    const data = await resp.json();
+    if(!resp.ok){ mostrarErroAuth(data.erro || 'Não foi possível entrar.'); return; }
+    entrarNoApp(data.usuario);
+  }catch(err){
+    mostrarErroAuth('Não foi possível falar com o servidor. Ele está rodando? Veja backend/README.md.');
+  }
+});
+
+registerForm.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  limparErroAuth();
+  const nome = document.getElementById('regNome').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const cargo = document.getElementById('regCargo').value;
+  const senha = document.getElementById('regSenha').value;
+  try{
+    const resp = await fetch('/api/register', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      credentials:'same-origin',
+      body: JSON.stringify({ nome, email, cargo, senha })
+    });
+    const data = await resp.json();
+    if(!resp.ok){ mostrarErroAuth(data.erro || 'Não foi possível criar a conta.'); return; }
+    entrarNoApp(data.usuario);
+  }catch(err){
+    mostrarErroAuth('Não foi possível falar com o servidor. Ele está rodando? Veja backend/README.md.');
+  }
+});
+
+document.getElementById('logoutBtn').onclick = async ()=>{
+  try{ await fetch('/api/logout', { method:'POST', credentials:'same-origin' }); }catch(e){}
+  currentUser = null;
+  appScreen.hidden = true;
+  authScreen.hidden = false;
+  loginForm.reset();
+  registerForm.reset();
+};
+
+// Ao carregar a página, verifica se já existe uma sessão válida (cookie de login)
+async function verificarSessao(){
+  try{
+    const resp = await fetch('/api/me', { credentials:'same-origin' });
+    if(resp.ok){
+      const data = await resp.json();
+      entrarNoApp(data.usuario);
+      return;
+    }
+  }catch(e){ /* backend fora do ar — mostra a tela de login normalmente */ }
+  authScreen.hidden = false;
+  appScreen.hidden = true;
+}
+
+// ============================================================================
+// RENDER: SIDEBAR (destaca o cargo do usuário logado)
+// ============================================================================
 function renderSidebar(){
   const list = document.getElementById('cargoList');
   list.innerHTML = '';
   cargos.forEach(c=>{
     const div = document.createElement('div');
-    div.className = 'cargo-item' + (c.id===currentRole ? ' active' : '');
+    div.className = 'cargo-item' + (currentUser && c.id === currentUser.cargo ? ' active' : '');
     div.innerHTML = `<strong>${c.nome}</strong><small>${c.desc}</small>`;
     list.appendChild(div);
   });
 }
 
-// ---------- RENDER: ROLE SWITCH ----------
-function renderRoleSwitch(){
-  const sel = document.getElementById('roleSwitch');
-  sel.innerHTML = cargos.map(c=>`<option value="${c.id}" ${c.id===currentRole?'selected':''}>${c.nome}</option>`).join('');
-  sel.onchange = (e)=>{ currentRole = e.target.value; renderSidebar(); renderBoard(); };
-}
-
-// ---------- RENDER: CATEGORY SELECT ----------
+// ---------- RENDER: CATEGORY SELECT (modal de nova tarefa) ----------
 function renderCategorySelect(){
   const sel = document.getElementById('taskCategory');
   sel.innerHTML = Object.entries(categorias).map(([key,c])=>`<option value="${key}">${c.label}</option>`).join('');
@@ -57,11 +177,13 @@ function renderCategorySelect(){
 }
 
 function updateRoutingNote(){
+  if(!currentUser) return;
   const key = document.getElementById('taskCategory').value;
   const cat = categorias[key];
   const note = document.getElementById('routingNote');
   const responsavelCargo = cargos.find(c=>c.id===cat.responsavel);
-  const podeResolver = responsavelCargo.resolve.includes(key) && cat.responsavel===currentRole || cargos.find(c=>c.id===currentRole).resolve.includes(key);
+  const meuCargo = cargos.find(c=>c.id===currentUser.cargo);
+  const podeResolver = meuCargo.resolve.includes(key);
   note.classList.add('show');
   if(podeResolver){
     note.className = 'routing-note show self';
@@ -119,7 +241,7 @@ function renderBoard(){
   });
 }
 
-// ---------- MODAL ----------
+// ---------- MODAL NOVA TAREFA ----------
 const overlay = document.getElementById('overlay');
 document.getElementById('newTaskBtn').onclick = ()=>{
   document.getElementById('taskTitle').value='';
@@ -141,10 +263,17 @@ document.getElementById('confirmTask').onclick = ()=>{
   renderBoard();
 };
 
-// ---------- CHAT ----------
+// ---------- CHAT (usa o nome real da pessoa logada) ----------
 const chatPanel = document.getElementById('chatPanel');
-document.getElementById('chatToggle').onclick = ()=>{ chatPanel.classList.add('open'); renderChat(); };
-document.getElementById('chatClose').onclick = ()=> chatPanel.classList.remove('open');
+document.getElementById('chatToggle').onclick = ()=>{
+  chatPanel.classList.add('open');
+  document.body.classList.add('chat-open');
+  renderChat();
+};
+document.getElementById('chatClose').onclick = ()=>{
+  chatPanel.classList.remove('open');
+  document.body.classList.remove('chat-open');
+};
 
 function renderChat(){
   const box = document.getElementById('chatMessages');
@@ -156,8 +285,8 @@ function renderChat(){
 function sendChat(){
   const input = document.getElementById('chatInput');
   const texto = input.value.trim();
-  if(!texto) return;
-  const autor = cargos.find(c=>c.id===currentRole).nome;
+  if(!texto || !currentUser) return;
+  const autor = `${currentUser.nome} · ${currentUser.cargoNome || currentUser.cargo}`;
   chatMessages.push({ autor, texto });
   input.value='';
   renderChat();
@@ -165,7 +294,60 @@ function sendChat(){
 document.getElementById('chatSend').onclick = sendChat;
 document.getElementById('chatInput').addEventListener('keydown', (e)=>{ if(e.key==='Enter') sendChat(); });
 
-// ---------- INIT ----------
-renderSidebar();
-renderRoleSwitch();
-renderBoard();
+// ============================================================================
+// TEMA CLARO / ESCURO
+// ============================================================================
+const root = document.documentElement;
+const themeToggle = document.getElementById('themeToggle');
+const themeColorMeta = document.getElementById('themeColorMeta');
+const THEME_COLORS = { dark: '#0B0B14', light: '#F5F2FA' };
+
+function applyTheme(theme){
+  root.setAttribute('data-theme', theme);
+  themeColorMeta.setAttribute('content', THEME_COLORS[theme] || THEME_COLORS.dark);
+  try{ localStorage.setItem('athena-theme', theme); }catch(e){}
+}
+themeToggle.onclick = ()=>{
+  const atual = root.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  applyTheme(atual === 'light' ? 'dark' : 'light');
+};
+if (window.matchMedia){
+  window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e)=>{
+    let saved = null;
+    try{ saved = localStorage.getItem('athena-theme'); }catch(err){}
+    if(!saved) applyTheme(e.matches ? 'light' : 'dark');
+  });
+}
+applyTheme(root.getAttribute('data-theme') === 'light' ? 'light' : 'dark');
+
+// ============================================================================
+// MENU MOBILE (GAVETA DE CARGOS)
+// ============================================================================
+const navToggle = document.getElementById('navToggle');
+const scrim = document.getElementById('scrim');
+
+function openNav(){
+  document.body.classList.add('nav-open');
+  navToggle.setAttribute('aria-expanded', 'true');
+}
+function closeNav(){
+  document.body.classList.remove('nav-open');
+  navToggle.setAttribute('aria-expanded', 'false');
+}
+navToggle.onclick = ()=>{
+  document.body.classList.contains('nav-open') ? closeNav() : openNav();
+};
+scrim.addEventListener('click', ()=>{
+  closeNav();
+  chatPanel.classList.remove('open');
+  document.body.classList.remove('chat-open');
+});
+window.addEventListener('resize', ()=>{
+  if(window.innerWidth > 860) closeNav();
+});
+
+// ============================================================================
+// INIT
+// ============================================================================
+carregarCargosParaCadastro();
+verificarSessao();
